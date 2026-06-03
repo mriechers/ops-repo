@@ -1,0 +1,5 @@
+# Session manifests land here as JSONL files, one per session.
+# Naming: <session-id>.jsonl where session-id is "<YYYY-MM-DDTHHmm>-<agent>-<operation>-<topic>"
+#
+# Append-only — never edit a manifest after it's written. Corrections append a new row
+# with operation: superseded, supersedes: <line-number>.

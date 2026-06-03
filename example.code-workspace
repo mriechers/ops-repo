@@ -1,0 +1,26 @@
+{
+  "folders": [
+    {
+      "name": "metarepo (parent)",
+      "path": "."
+    },
+    {
+      "name": "my-service-a (child)",
+      "path": "../my-service-a"
+    },
+    {
+      "name": "my-service-b (child)",
+      "path": "../my-service-b"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/.git": true,
+      "**/.DS_Store": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/.worktrees": true
+    }
+  }
+}

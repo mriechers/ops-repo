@@ -82,6 +82,15 @@ Single-file cross-repo asks (e.g. one config reservation that touches two servic
 
 **Iteration:** observations on what worked and what didn't go in `planning/team-structure-log.md`. After each team-dispatch session, append 3–5 lines.
 
+## MCP servers
+
+<!-- TODO: optional. List MCP servers relevant to work in this workspace so agents discover them without re-asking each session. Delete this section if you don't use MCP servers, or if they're already documented at the global Claude Code config level. -->
+
+| Server | Purpose | Notes |
+|---|---|---|
+| <!-- e.g. fantastical --> | <!-- e.g. calendar awareness during planning --> | <!-- e.g. read-only by default --> |
+| <!-- e.g. airtable --> | <!-- e.g. ticket / inventory lookups --> | <!-- e.g. base/table IDs in planning/airtable-primer.md --> |
+
 ## Workspace file
 
 Open `<your-org>.code-workspace` (or whatever you renamed `example.code-workspace` to) to load all sibling repos as a multi-root workspace.

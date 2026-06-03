@@ -1,0 +1,18 @@
+#!/bin/bash
+# Commit-message hook — placeholder.
+#
+# If your workspace has a shared commit-msg hook (e.g. the-lodge/conventions/git-hooks/commit-msg
+# that enforces a workspace commit convention), delegate to it like so:
+#
+#   LODGE_DIR="${HOME}/Developer/the-lodge"
+#   if [[ -x "${LODGE_DIR}/conventions/git-hooks/commit-msg" ]]; then
+#     exec "${LODGE_DIR}/conventions/git-hooks/commit-msg" "$@"
+#   fi
+#
+# Otherwise, replace this file with whatever commit-message validation you want.
+#
+# To enable hooks after adapting this file:
+#   chmod +x .githooks/commit-msg
+#   git config core.hooksPath .githooks
+
+exit 0

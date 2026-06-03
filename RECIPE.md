@@ -46,6 +46,31 @@ Open `ROADMAP.md`. The three sections (In flight / On deck / Recently completed)
 
 If you can't fill any section, delete the example bullet — an empty section is better than a misleading placeholder.
 
+## Step 3.5 — Enable AGENTS.md and the commit-msg hook
+
+Two small chores that the template ships placeholders for:
+
+**AGENTS.md** — the template ships `AGENTS.md` as a symlink to `CLAUDE.md` so non-Claude harnesses (Codex, Gemini CLI) discover the same coordination doc. Verify it points at the right place:
+
+```bash
+ls -la AGENTS.md   # should show: AGENTS.md -> CLAUDE.md
+```
+
+If it didn't survive the template-clone (some GitHub flows lose symlinks), recreate it:
+
+```bash
+ln -s CLAUDE.md AGENTS.md
+```
+
+**`.githooks/commit-msg`** — the template ships a placeholder. If your workspace has a shared commit-msg hook (e.g. a `the-lodge/conventions/git-hooks/commit-msg` that enforces a workspace commit convention), edit `.githooks/commit-msg` per the instructions in that file to delegate to it. Then:
+
+```bash
+chmod +x .githooks/commit-msg
+git config core.hooksPath .githooks
+```
+
+If you don't have a shared hook, you can leave the placeholder or delete the `.githooks/` directory entirely.
+
 ## Step 4 — Add your first child repo to the workspace
 
 Open `example.code-workspace`, rename it (`<your-org>.code-workspace`), and add folder entries:

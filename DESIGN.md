@@ -167,6 +167,15 @@ A multi-root VS Code workspace that loads the parent + every child as a peer fol
 
 Don't ship these on day one. Add them when the absence is causing pain.
 
+### 4.8 What does NOT live at the parent level
+
+A few things deliberately stay in the children, even though they'd seem convenient at the parent:
+
+- **`knowledge/` directories** — per-repo domain documentation (architecture diagrams, API references, runbooks) lives in each child's `knowledge/` and is aggregated by workspace-wide tooling. The metarepo doesn't aggregate it — that's a workspace concern.
+- **Per-repo `progress.md`** (session handoff log within a single child) — owned by that child's planning/, not the parent's. The parent's `team-structure-log.md` is observations about how teams worked across repos, not session-by-session continuity inside any one repo.
+- **Repository naming conventions** — child-repo names follow the workspace's naming convention (typically a workspace-wide `REPOSITORY_NAMING.md`), not the metarepo's. The metarepo lists its children but doesn't dictate how they're named.
+- **CI configuration** — each child runs its own CI. The metarepo has no CI; convention enforcement at this layer is social.
+
 ## 5. The agent hierarchy
 
 ```
@@ -194,7 +203,7 @@ Supervising agent (main session thread)
 
 **Per-repo Guardian** = a child-repo agent that gates high-risk operations in that child. The Lead invokes the Guardian before executing irreversible changes.
 
-**Known gap:** the parent layer can't easily *discover* the Guardian agents that live in child repos. They're registered in each child's CLAUDE.md but invisible to the parent's `.claude/agents/` listing. In practice this means a parent-level agent that needs Guardian review for a child must either (a) be explicitly briefed on the Guardian's name, (b) defer to a child-repo session, or (c) escalate to the human operator. See §8.
+**Known gap:** the parent layer can't easily *discover* the Guardian agents that live in child repos. They're registered in each child's CLAUDE.md but invisible to the parent's `.claude/agents/` listing. In practice this means a parent-level agent that needs Guardian review for a child must either (a) be explicitly briefed on the Guardian's name, (b) defer to a child-repo session, or (c) escalate to the human operator. See §10.
 
 ## 6. Communication patterns
 
@@ -274,7 +283,77 @@ You don't need one on day one. Add it when:
 
 The template ships with `planning/domain-class-example/` to show the shape. Rename it to your domain (e.g. `planning/file-ops/`, `planning/deploys/`, `planning/billing-api/`) when you're ready, or delete it if you don't need one.
 
-## 8. Known gaps & honest limitations
+## 8. Compliance ladder & lifecycle
+
+This pattern composes with per-repo standards (e.g. the-lodge's `REPO_SETUP_AND_STANDARDS.md`) into a **unified compliance ladder**. Both single-project repos and metarepos progress up the same levels; what differs at each level is the *content* of the slots, not the slots themselves.
+
+### Compliance ladder
+
+| Level | What's required | Single-project repo | Metarepo |
+|---|---|---|---|
+| **L1 — Discoverable** | `CLAUDE.md` exists | Project overview, tech stack, run commands | Sibling-repo table, rules-for-agents |
+| **L2 — Standard** | + `AGENTS.md` symlink, `.gitignore`, `.githooks/commit-msg` | (same) | (same) |
+| **L3 — Active** | + `planning/` substrate | `planning/{README, progress, backlog}.md` | `planning/{README, HANDOFF_TEMPLATE, backlog, team-structure-log}.md` + `ROADMAP.md` |
+| **L4 — Cross-cutting** | + cross-cutting agents & binding contracts | (rare — only if the repo has risky multi-step domain ops) | `.claude/agents/<cross-cutting>.md` + `planning/<domain-class>/` binding contract |
+
+A repo's level is the highest one where *all* requirements are met. A metarepo at L3 has filled out its ROADMAP and at least one handoff doc; an L4 metarepo also runs cross-cutting agents like archivists.
+
+**Most repos target L2.** L3 is for active workstreams. L4 is for workspaces that have risky multi-step domains worth investing in a binding contract.
+
+### Lifecycle
+
+Metarepos move through the same lifecycle as their children, just at a different cadence:
+
+```
+incubating  →  active  →  paused  →  archived
+```
+
+- **Incubating** — the parent CLAUDE.md exists but the sibling-repo table has 0–1 entries; ROADMAP is empty; no handoff docs yet. Pattern not yet earning its weight.
+- **Active** — siblings are real, ROADMAP has in-flight entries, handoff docs accumulate at a rhythm. The bookend rituals (`/start`, `/wrap-up`) are running cleanly.
+- **Paused** — no new handoffs in 90+ days; ROADMAP hasn't moved; siblings still active but no longer coordinated through this layer. Either the pattern stopped serving the work or the work stopped happening.
+- **Archived** — the workspace concluded. Mark `CLAUDE.md` with a note at top; freeze the ROADMAP; commit a final `planning/<date>-archive-handoff.md` summarizing the workspace's outcome.
+
+Don't archive a metarepo just because no one has touched it in a month — paused-then-revived is a real state. Archive when the coordination is genuinely done (children all archived, or split into a different workspace).
+
+## 9. Session bookends
+
+This pattern is a **content layer**. The bookend skills `/start` and `/wrap-up` are the **process layer** that consults it. They're orthogonal — the metarepo pattern doesn't replace the bookends, and the bookends don't subsume the metarepo. They cooperate at well-defined integration points.
+
+### What the bookends own (workspace-wide)
+
+- **Session-clean invariant** — `/wrap-up` enforces clean main + no orphan worktrees + no scattered branches at session end; `/start` verifies on the next session
+- **Workspace-scoped breadcrumb** — `~/.lodge/last-session.json` (or your workspace's equivalent) carries cross-session state
+- **PR and issue survey** — workspace-wide listing of open work
+- **Scattered-work detection** — branches with commits ahead of main but no open PR
+
+### What the metarepo provides (workstream-wide)
+
+- **`ROADMAP.md`** — workstream-level state spanning many sessions (the breadcrumb is one session; the ROADMAP is months)
+- **Handoff docs** — async coordination artifacts that bookends should know to update
+- **`team-structure-log.md`** — observation log that bookends should know to append when a session dispatched teams
+- **Binding-contract session manifests** — audit substrate that bookends should know about but not write
+
+### Integration points (gaps the bookends should grow into)
+
+When the bookends meet a metarepo, five integrations would close the loop:
+
+1. **`/wrap-up` Phase 1 routing** should know that the parent's `planning/` is a legitimate destination for cross-cutting concerns (not just child-repo GitHub issues).
+2. **`/wrap-up` Phase 2 scattered-work check** should multiply across the sibling-repo table when the current dir is a metarepo or one of its children.
+3. **`/wrap-up` Phase 3 clustering** should produce one PR per repo touched, with cross-repo coordination landing as a handoff doc in the parent's `planning/`.
+4. **`/wrap-up` Phase 8 breadcrumb** should record which metarepo workstreams were active alongside `repos_touched` and `open_prs`.
+5. **`/start` Phase 1c / Phase 5** should read the parent's `ROADMAP.md` and surface in-flight workstreams as path-forward options.
+
+### Convention markers the bookends can detect
+
+The metarepo pattern is **self-announcing** — no extra machinery needed for the bookends to find it:
+
+- **"Am I in a metarepo or one of its children?"** → check the parent directory's `CLAUDE.md` for a sibling-repo table that includes the current repo
+- **"Which handoffs touch my session's files?"** → grep `planning/*.md` for filenames the session changed
+- **"What's in flight?"** → parse the "In flight" section of `<metarepo>/ROADMAP.md`
+
+A bookend evolution doesn't require any change to this template — it requires the bookend skill to learn these three checks. This template documents the markers so that work can happen independently.
+
+## 10. Known gaps & honest limitations
 
 **Child-repo Guardians aren't discoverable from the parent.** Guardian agents live in child-repo `.claude/agents/` directories, so the parent's agent registry doesn't see them. When a parent-level agent needs Guardian review, it has to either be briefed explicitly, defer to a child-repo session, or escalate to the operator. Not solved; documented honestly.
 
@@ -286,7 +365,7 @@ The template ships with `planning/domain-class-example/` to show the shape. Rena
 
 **Cross-cutting agents can rot.** A `file-archivist` that nobody invokes for 6 months is a stale agent — its mental model of the substrate may have drifted from reality. The `SESSION_LOG.md` is a leading indicator: if no rows have been added in months, audit the agent before invoking it next.
 
-## 9. Appendix: worked example (homelab)
+## 11. Appendix: worked example (homelab)
 
 The pattern crystallized from `mriechers/homelab`, a coordination layer over five sibling repos:
 

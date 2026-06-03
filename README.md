@@ -32,7 +32,7 @@ The worked example uses **Claude Code** conventions (`.claude/agents/`, `.claude
 
 ## Designed by living example
 
-Patterns crystallized from `mriechers/homelab` — a coordination layer over five sibling repos (Home Assistant, OPNsense, Proxmox, and two third-party theme forks). The [appendix in DESIGN.md](DESIGN.md#9-appendix-worked-example-homelab) maps each slot in this template to its filled-in version there.
+Patterns crystallized from `mriechers/homelab` — a coordination layer over five sibling repos (Home Assistant, OPNsense, Proxmox, and two third-party theme forks). The [appendix in DESIGN.md](DESIGN.md#11-appendix-worked-example-homelab) maps each slot in this template to its filled-in version there.
 
 ## License
 

@@ -135,7 +135,15 @@ The ROADMAP is *not* the source of truth for any workstream — it points to aut
 - An `infra-deployer` that orchestrates deploys across services owned by different child repos
 - A `coordination-secretary` that maintains the ROADMAP, backlog, and team-structure-log
 
-Agents that work inside a single child repo live in *that child's* `.claude/agents/`, not here. The rule of thumb: if removing a child repo from the workspace would obsolete the agent, the agent belongs in that child.
+**Where domain experts live — the discovery constraint.** Claude Code discovers subagents only from the *current project root's* `.claude/agents/` plus global `~/.claude/agents/`. It does **not** descend into nested child-repo `.claude/agents/`. So a child's own `.claude/agents/` is visible **only** to a session rooted in that child — never to a coordination-layer session or a Lead dispatched from it.
+
+That has a sharp consequence for **domain experts you invoke during cross-repo orchestration** — most importantly per-domain **Guardians** (safety review before a risky deploy):
+
+- **Define them at the coordination layer** (`<parent>/.claude/agents/`), namespaced by domain (`proxmox-guardian`, `opnsense-guardian`, …), each with an "invocation context" note declaring its **domain child repo** (a same-named child dir) and stating that its repo-relative paths resolve there. This is the *only* way to "call the expert into the coordination space" — and it's a single definition with **no sync/symlink** to drift.
+- **The supervising agent owns the hand-off.** A dispatched Lead is itself a subagent and can't reliably spawn one, so the *parent thread* summons the Guardian to bless a Lead's flagged safety-zone change, then integrates.
+- **Trade-off:** a session opened *standalone* inside a child repo won't see these parent-defined experts. Accept it — do safety-sensitive child work from the workspace so the Guardian is reachable. Don't keep a second copy in the child to "fix" this; that reintroduces the very drift the single definition exists to avoid.
+
+The original rule of thumb still holds for the **truly child-local** case: an agent that *only ever* runs inside a standalone child session — and is never part of coordination-layer orchestration — can live in that child's `.claude/agents/`. But anything a coordination session needs to call (guardians, cross-repo brainstormers, domain reviewers) belongs at the parent. Rephrased: *if you'll ever invoke it from the coordination layer, define it at the coordination layer.*
 
 ### 4.5 `.claude/skills/` — composable pipeline skills
 
@@ -183,11 +191,11 @@ Supervising agent (main session thread)
 │
 ├── per-repo Lead (dispatched for child A)
 │       │
-│       └── invokes child A's Guardian on risky ops
+│       └── flags risky ops up; parent invokes the coordination-layer Guardian
 │
 ├── per-repo Lead (dispatched for child B)
 │       │
-│       └── invokes child B's Guardian on risky ops
+│       └── flags risky ops up; parent invokes the coordination-layer Guardian
 │
 └── cross-cutting agent (e.g. file-archivist, at parent level)
         │

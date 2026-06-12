@@ -74,7 +74,7 @@ This pattern fixes those failures with three layers:
                   └──────────────┘ └────────────┘ └───────────┘
 ```
 
-The parent layer is a coordination overlay. Each child is a fully independent repo with its own remote, CI, CLAUDE.md, and (optionally) a Guardian agent that gates risky in-repo work.
+The parent layer is a coordination overlay. Each child is a fully independent repo with its own remote, CI, and CLAUDE.md. A child may *optionally* keep its own Guardian for **standalone in-repo work** — but any Guardian you invoke during cross-repo orchestration lives at the **parent** `.claude/agents/`, not the child (the diagram above shows the standalone-Guardian case; see §4.4 for why coordination-invoked experts must be parent-owned).
 
 ## 4. Core slots
 

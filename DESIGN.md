@@ -74,7 +74,7 @@ This pattern fixes those failures with three layers:
                   └──────────────┘ └────────────┘ └───────────┘
 ```
 
-The parent layer is a coordination overlay. Each child is a fully independent repo with its own remote, CI, CLAUDE.md, and (optionally) a Guardian agent that gates risky in-repo work.
+The parent layer is a coordination overlay. Each child is a fully independent repo with its own remote, CI, and CLAUDE.md. A child may *optionally* keep its own Guardian for **standalone in-repo work** — but any Guardian you invoke during cross-repo orchestration lives at the **parent** `.claude/agents/`, not the child (the diagram above shows the standalone-Guardian case; see §4.4 for why coordination-invoked experts must be parent-owned).
 
 ## 4. Core slots
 
@@ -141,6 +141,7 @@ That has a sharp consequence for **domain experts you invoke during cross-repo o
 
 - **Define them at the coordination layer** (`<parent>/.claude/agents/`), namespaced by domain (`proxmox-guardian`, `opnsense-guardian`, …), each with an "invocation context" note declaring its **domain child repo** (a same-named child dir) and stating that its repo-relative paths resolve there. This is the *only* way to "call the expert into the coordination space" — and it's a single definition with **no sync/symlink** to drift.
 - **The supervising agent owns the hand-off.** A dispatched Lead is itself a subagent and can't reliably spawn one, so the *parent thread* summons the Guardian to bless a Lead's flagged safety-zone change, then integrates.
+- **Cleaner child repos (bonus).** Beyond reachability, this factors the Claude/AI tooling *out* of each child's functioning codebase and collapses it into the coordination layer — the product and its agent harness stop intermingling, so a child repo reads as just the thing it ships rather than a thing-plus-its-orchestration-scaffolding.
 - **Trade-off:** a session opened *standalone* inside a child repo won't see these parent-defined experts. Accept it — do safety-sensitive child work from the workspace so the Guardian is reachable. Don't keep a second copy in the child to "fix" this; that reintroduces the very drift the single definition exists to avoid.
 
 The original rule of thumb still holds for the **truly child-local** case: an agent that *only ever* runs inside a standalone child session — and is never part of coordination-layer orchestration — can live in that child's `.claude/agents/`. But anything a coordination session needs to call (guardians, cross-repo brainstormers, domain reviewers) belongs at the parent. Rephrased: *if you'll ever invoke it from the coordination layer, define it at the coordination layer.*

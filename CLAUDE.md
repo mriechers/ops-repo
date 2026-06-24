@@ -50,7 +50,8 @@ Agents working on one project have historically dropped files into sibling proje
 2. **Cross-project work lives here, at the parent level.** If your work for project A requires a coordinated change in project B, write a handoff doc in `planning/` here — never inside the sibling project.
 3. **Handoff filename pattern:** `planning/YYYY-MM-DD-{topic}-handoff.md` (see `planning/HANDOFF_TEMPLATE.md`).
 4. **Quick cross-repo items** that don't yet justify a full handoff doc go in `planning/backlog.md` as one-liners.
-5. **The parent repo is a coordination overlay, not a monorepo.** <!-- TODO: tweak based on whether this metarepo is public or private. If private: "Child repos are gitignored at the parent level and never tracked here; their content always lives in their own remotes. There is no CI on the parent — cross-repo handoff docs land direct-to-`main` rather than via PR." If public, you may want a PR workflow for handoff docs. -->
+5. **The parent repo is a coordination overlay, not a monorepo.** <!-- TODO: tweak based on whether this ops repo is public or private. If private: "Child repos are gitignored at the parent level and never tracked here; their content always lives in their own remotes. There is no heavy CI on the parent — cross-repo handoff docs land direct-to-`main` rather than via PR." If public, you may want a PR workflow for handoff docs. -->
+6. **This is an ops repo: it houses NO first-party buildable code.** It coordinates sibling repos; it does not build anything itself. The product here is *documents* — the sibling table, the ROADMAP, handoffs, cross-cutting agents, binding contracts. Buildable code lives in the children (their own remotes + CI). If you find yourself wanting to add an application, a service, or a package *to this repo*, stop: that code belongs in a child project repo, and this directory only points at it. A repo that fuses coordination + buildable code is not a sanctioned shape — it's a retrofit target to be un-fused (slim ops repo + one or more project repos; split on the buildable-code-vs-coordination boundary, not service count — a multi-service monorepo is one *project* repo). See the workspace's retrofit playbook.
 
 ## Cross-cutting platforms
 
@@ -99,6 +100,6 @@ Open `<your-org>.code-workspace` (or whatever you renamed `example.code-workspac
 
 <!-- TODO: optional. If you adopted this layer from another pattern source (e.g. another workspace, an internal pattern doc), name it here so future agents know where the conventions originated.
 
-Example: "This layer mirrors the planning/handoff conventions from the metarepo-pattern template (https://github.com/mriechers/metarepo-pattern)."
+Example: "This layer mirrors the planning/handoff conventions from the ops-repo template (https://github.com/mriechers/ops-repo)."
 
 Delete this section if it doesn't apply. -->

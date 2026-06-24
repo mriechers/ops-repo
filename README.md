@@ -1,6 +1,6 @@
-# metarepo-pattern
+# ops-repo
 
-A template for scaffolding a **coordination layer** over N independent sibling git repos — designed for agent-driven workflows where work routinely crosses repo boundaries.
+A template for scaffolding an **ops repo** — a coordination layer over N independent sibling git repos, designed for agent-driven workflows where work routinely crosses repo boundaries. An ops repo coordinates sibling repos and houses no first-party buildable code of its own.
 
 ## What this is
 

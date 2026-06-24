@@ -1,4 +1,4 @@
-# The Metarepo Coordination Pattern
+# The Ops-Repo Coordination Pattern
 
 A design doc for scaffolding a parent layer that supervises N independent sibling git repos, with built-in patterns for agent communication, async cross-repo handoffs, and cross-cutting domain agents.
 
@@ -38,11 +38,19 @@ This pattern fixes those failures with three layers:
 
 **Scaling notes.** This pattern is well-tested in the 3–7 child repo range. Past ~15, the supervisor agent's context starts to fragment and the ROADMAP becomes a wall of text. The "single supervising agent dispatching per-repo Leads" pattern probably wants to become "domain-clustered supervisors" past that point — out of scope here.
 
+### The purity rule: coordination, not code
+
+**An ops repo houses NO first-party buildable code. It coordinates sibling repos only.** Its product is *documents* — the sibling-repo table, the ROADMAP index, dated handoffs, cross-cutting agents, binding contracts. The buildable code it coordinates always lives in the children, behind their own remotes and CI.
+
+This is the bright line that separates the two sanctioned archetypes: the **ops/coordination repo** (this template) and the **project repo** (one buildable deliverable, ships its own code + CI). The boundary between them is **buildable code vs. coordination — not service count.** A multi-service monorepo with one shared runtime, one CI, and one release cadence is a single *project* repo, however many services it contains. It is not an ops repo.
+
+A repo that fuses both — coordination plumbing *and* first-party buildable code in one directory — is **not a third archetype.** It is a **retrofit target**: a fused repo that should be *un-fused* into a slim ops repo plus one or more project repos. (Workspaces running this template should keep a retrofit playbook for the un-fusing; the rule that makes it non-disruptive is exactly the boundary above — split on buildable-code-vs-coordination, and a legitimate monorepo stays whole as one project repo rather than being force-extracted.) Don't reach for this template to wrap a codebase you also build here; reach for it only when the thing you're scaffolding is pure coordination over repos that build elsewhere.
+
 ## 3. The pattern at a glance
 
 ```
                        ┌─────────────────────────────────────┐
-                       │  Metarepo (this template)           │
+                       │  Ops repo (this template)           │
                        │                                     │
                        │  Structural:                        │
                        │    CLAUDE.md  ROADMAP.md            │
@@ -176,14 +184,16 @@ A multi-root VS Code workspace that loads the parent + every child as a peer fol
 
 Don't ship these on day one. Add them when the absence is causing pain.
 
+**Live-state collector (a maturity practice).** A hand-maintained `SNAPSHOT.md` drifts the moment reality moves. Once a coordination layer carries volatile facts an agent must trust — current IPs, deployed versions, live hostnames, LXC rosters — the mature move is to stop hand-copying them and instead **auto-generate a `live-state.md` from reality** (a script that queries the running systems and rewrites the file). The CLAUDE.md and handoffs then *point at* `live-state.md` rather than restating its facts inline, so the always-loaded coordination manifest never goes stale. This directly defeats doc-vs-reality drift: a regenerated file can't lie for long. Adopt it when your CLAUDE.md is heavy with infrastructure facts that change under you — it's the same impulse as "reference, don't duplicate," applied to live state.
+
 ### 4.8 What does NOT live at the parent level
 
 A few things deliberately stay in the children, even though they'd seem convenient at the parent:
 
-- **`knowledge/` directories** — per-repo domain documentation (architecture diagrams, API references, runbooks) lives in each child's `knowledge/` and is aggregated by workspace-wide tooling. The metarepo doesn't aggregate it — that's a workspace concern.
+- **`knowledge/` directories** — per-repo domain documentation (architecture diagrams, API references, runbooks) lives in each child's `knowledge/` and is aggregated by workspace-wide tooling. The ops repo doesn't aggregate it — that's a workspace concern.
 - **Per-repo `progress.md`** (session handoff log within a single child) — owned by that child's planning/, not the parent's. The parent's `team-structure-log.md` is observations about how teams worked across repos, not session-by-session continuity inside any one repo.
-- **Repository naming conventions** — child-repo names follow the workspace's naming convention (typically a workspace-wide `REPOSITORY_NAMING.md`), not the metarepo's. The metarepo lists its children but doesn't dictate how they're named.
-- **CI configuration** — each child runs its own CI. The metarepo has no CI; convention enforcement at this layer is social.
+- **Repository naming conventions** — child-repo names follow the workspace's naming convention (typically a workspace-wide `REPOSITORY_NAMING.md`), not the ops repo's. The ops repo lists its children but doesn't dictate how they're named.
+- **Heavy CI (lint/typecheck/test matrices)** — each child runs its own. The ops repo has no build to test, so the lint/typecheck/test layer stays in the children; coordination-convention enforcement at the parent is social, not mechanical. **One exception: a floor secret-scan.** Even a pure coordination repo should run a minimal secret-scan CI (e.g. gitleaks on push) — it's cheap, and a leaked credential in a handoff doc is the one failure social enforcement *can't* catch. So: no heavy CI on the coordination layer, but a secret-scan floor everywhere. (See §10.)
 
 ## 5. The agent hierarchy
 
@@ -212,7 +222,7 @@ Supervising agent (main session thread)
 
 **Per-repo Guardian** = a child-repo agent that gates high-risk operations in that child. The Lead invokes the Guardian before executing irreversible changes.
 
-**Known gap:** the parent layer can't easily *discover* the Guardian agents that live in child repos. They're registered in each child's CLAUDE.md but invisible to the parent's `.claude/agents/` listing. In practice this means a parent-level agent that needs Guardian review for a child must either (a) be explicitly briefed on the Guardian's name, (b) defer to a child-repo session, or (c) escalate to the human operator. See §10.
+**Resolved by §4.4's canonical pattern:** rather than letting Guardians live in child repos (where the parent can't discover them), **define every domain expert at the coordination layer, single definition, no symlink** — namespaced by domain, each declaring the child repo its paths resolve against. The parent thread then summons the Guardian directly. This is now the rule, not an aspiration; both homelab and wonder-cabinet run it in production. See §10, where the former "undiscoverable Guardians" gap is marked resolved.
 
 ## 6. Communication patterns
 
@@ -282,6 +292,10 @@ A binding contract folder typically contains:
 3. **Compliance is auditable.** Append-only manifests form a queryable audit trail. A jq query lists all non-compliant sessions. No silent partial-compliance.
 4. **Deviation is visible.** The design brief constrains newcomers to specific creative axes and inherits everything else. Deviations are flagged as operator decisions, not silent redesigns.
 
+### Two contract shapes: mutating pipeline and audit harness
+
+The file-ops/deploys/billing examples above are all **mutating** contracts — they gate a pipeline that *changes* state (moves files, ships a deploy, calls a paid API), so the discipline is about backup, approval, and rollback. But the same binding-contract substrate fits a second shape: a **read-only, re-runnable audit harness**. Homelab's `planning/security/` is the reference — a threat-model + a set of checks + a baseline + a `run.sh`, re-run on a cadence to surface drift between the documented security posture and live reality. Here "compliance" isn't "did you snapshot before mutating" but "did you run the full check set against the current baseline and triage every new finding." The session manifests, attestation header, and append-only `SESSION_LOG.md` carry over unchanged; only the invariants differ (coverage + baseline-diff instead of backup + rollback). When your cross-cutting concern is *observing* a risky estate rather than *changing* it, reach for this variant.
+
 ### When to add a binding contract
 
 You don't need one on day one. Add it when:
@@ -294,24 +308,24 @@ The template ships with `planning/domain-class-example/` to show the shape. Rena
 
 ## 8. Compliance ladder & lifecycle
 
-This pattern composes with per-repo standards (e.g. the-lodge's `REPO_SETUP_AND_STANDARDS.md`) into a **unified compliance ladder**. Both single-project repos and metarepos progress up the same levels; what differs at each level is the *content* of the slots, not the slots themselves.
+This pattern composes with per-repo standards (e.g. the-lodge's `REPO_SETUP_AND_STANDARDS.md`) into a **unified compliance ladder**. Both single-project repos and ops repos progress up the same levels; what differs at each level is the *content* of the slots, not the slots themselves.
 
 ### Compliance ladder
 
-| Level | What's required | Single-project repo | Metarepo |
+| Level | What's required | Single-project repo | Ops repo |
 |---|---|---|---|
 | **L1 — Discoverable** | `CLAUDE.md` exists | Project overview, tech stack, run commands | Sibling-repo table, rules-for-agents |
 | **L2 — Standard** | + `AGENTS.md` symlink, `.gitignore`, `.githooks/commit-msg` | (same) | (same) |
 | **L3 — Active** | + `planning/` substrate | `planning/{README, progress, backlog}.md` | `planning/{README, HANDOFF_TEMPLATE, backlog, team-structure-log}.md` + `ROADMAP.md` |
 | **L4 — Cross-cutting** | + cross-cutting agents & binding contracts | (rare — only if the repo has risky multi-step domain ops) | `.claude/agents/<cross-cutting>.md` + `planning/<domain-class>/` binding contract |
 
-A repo's level is the highest one where *all* requirements are met. A metarepo at L3 has filled out its ROADMAP and at least one handoff doc; an L4 metarepo also runs cross-cutting agents like archivists.
+A repo's level is the highest one where *all* requirements are met. An ops repo at L3 has filled out its ROADMAP and at least one handoff doc; an L4 ops repo also runs cross-cutting agents like archivists.
 
 **Most repos target L2.** L3 is for active workstreams. L4 is for workspaces that have risky multi-step domains worth investing in a binding contract.
 
 ### Lifecycle
 
-Metarepos move through the same lifecycle as their children, just at a different cadence:
+Ops repos move through the same lifecycle as their children, just at a different cadence:
 
 ```
 incubating  →  active  →  paused  →  archived
@@ -322,11 +336,11 @@ incubating  →  active  →  paused  →  archived
 - **Paused** — no new handoffs in 90+ days; ROADMAP hasn't moved; siblings still active but no longer coordinated through this layer. Either the pattern stopped serving the work or the work stopped happening.
 - **Archived** — the workspace concluded. Mark `CLAUDE.md` with a note at top; freeze the ROADMAP; commit a final `planning/<date>-archive-handoff.md` summarizing the workspace's outcome.
 
-Don't archive a metarepo just because no one has touched it in a month — paused-then-revived is a real state. Archive when the coordination is genuinely done (children all archived, or split into a different workspace).
+Don't archive an ops repo just because no one has touched it in a month — paused-then-revived is a real state. Archive when the coordination is genuinely done (children all archived, or split into a different workspace).
 
 ## 9. Session bookends
 
-This pattern is a **content layer**. The bookend skills `/start` and `/wrap-up` are the **process layer** that consults it. They're orthogonal — the metarepo pattern doesn't replace the bookends, and the bookends don't subsume the metarepo. They cooperate at well-defined integration points.
+This pattern is a **content layer**. The bookend skills `/start` and `/wrap-up` are the **process layer** that consults it. They're orthogonal — the ops-repo pattern doesn't replace the bookends, and the bookends don't subsume the ops repo. They cooperate at well-defined integration points.
 
 ### What the bookends own (workspace-wide)
 
@@ -335,7 +349,7 @@ This pattern is a **content layer**. The bookend skills `/start` and `/wrap-up` 
 - **PR and issue survey** — workspace-wide listing of open work
 - **Scattered-work detection** — branches with commits ahead of main but no open PR
 
-### What the metarepo provides (workstream-wide)
+### What the ops repo provides (workstream-wide)
 
 - **`ROADMAP.md`** — workstream-level state spanning many sessions (the breadcrumb is one session; the ROADMAP is months)
 - **Handoff docs** — async coordination artifacts that bookends should know to update
@@ -344,29 +358,29 @@ This pattern is a **content layer**. The bookend skills `/start` and `/wrap-up` 
 
 ### Integration points (gaps the bookends should grow into)
 
-When the bookends meet a metarepo, five integrations would close the loop:
+When the bookends meet an ops repo, five integrations would close the loop:
 
 1. **`/wrap-up` Phase 1 routing** should know that the parent's `planning/` is a legitimate destination for cross-cutting concerns (not just child-repo GitHub issues).
-2. **`/wrap-up` Phase 2 scattered-work check** should multiply across the sibling-repo table when the current dir is a metarepo or one of its children.
+2. **`/wrap-up` Phase 2 scattered-work check** should multiply across the sibling-repo table when the current dir is an ops repo or one of its children.
 3. **`/wrap-up` Phase 3 clustering** should produce one PR per repo touched, with cross-repo coordination landing as a handoff doc in the parent's `planning/`.
-4. **`/wrap-up` Phase 8 breadcrumb** should record which metarepo workstreams were active alongside `repos_touched` and `open_prs`.
+4. **`/wrap-up` Phase 8 breadcrumb** should record which ops-repo workstreams were active alongside `repos_touched` and `open_prs`.
 5. **`/start` Phase 1c / Phase 5** should read the parent's `ROADMAP.md` and surface in-flight workstreams as path-forward options.
 
 ### Convention markers the bookends can detect
 
-The metarepo pattern is **self-announcing** — no extra machinery needed for the bookends to find it:
+The ops-repo pattern is **self-announcing** — no extra machinery needed for the bookends to find it:
 
-- **"Am I in a metarepo or one of its children?"** → check the parent directory's `CLAUDE.md` for a sibling-repo table that includes the current repo
+- **"Am I in an ops repo or one of its children?"** → check the parent directory's `CLAUDE.md` for a sibling-repo table that includes the current repo
 - **"Which handoffs touch my session's files?"** → grep `planning/*.md` for filenames the session changed
-- **"What's in flight?"** → parse the "In flight" section of `<metarepo>/ROADMAP.md`
+- **"What's in flight?"** → parse the "In flight" section of `<ops-repo>/ROADMAP.md`
 
 A bookend evolution doesn't require any change to this template — it requires the bookend skill to learn these three checks. This template documents the markers so that work can happen independently.
 
 ## 10. Known gaps & honest limitations
 
-**Child-repo Guardians aren't discoverable from the parent.** Guardian agents live in child-repo `.claude/agents/` directories, so the parent's agent registry doesn't see them. When a parent-level agent needs Guardian review, it has to either be briefed explicitly, defer to a child-repo session, or escalate to the operator. Not solved; documented honestly.
+**~~Child-repo Guardians aren't discoverable from the parent.~~ RESOLVED.** This was the original gap: Guardian agents living in child-repo `.claude/agents/` directories were invisible to the parent's agent registry, so a parent-level agent needing Guardian review had to be briefed explicitly, defer to a child session, or escalate. The fix is now the **canonical rule (§4.4)**: don't put domain experts in the children at all — **define every Guardian (and any other expert a coordination session invokes) at the parent, single definition, no symlink**, namespaced by domain and declaring the child its paths resolve against. The parent thread summons it directly; there's nothing to "discover." Two reference impls run this in production: homelab (`af472d9` — all 10 cross-cutting agents defined at the parent) and wonder-cabinet (`spectral-engineer`/`brand-guardian`, mirrored from homelab). The only accepted trade-off is that a *standalone* child session can't see the parent-defined expert — do safety-sensitive child work from the coordination layer, and don't keep a second copy in the child (that reintroduces the drift the single definition exists to avoid).
 
-**No CI on the parent layer.** The conventions in `CLAUDE.md` are enforced socially, not mechanically. If an agent ignores the "stay in your project" rule, nothing catches it except the next reader. This is a feature for low-stakes coordination layers but a bug if you grow past ~10 children with multiple human contributors.
+**No *heavy* CI on the parent layer — but run a secret-scan floor.** The coordination conventions in `CLAUDE.md` (the "stay in your project" rule, the handoff-filename pattern) are enforced socially, not mechanically; if an agent ignores them, nothing catches it but the next reader. That's an accepted feature for a low-stakes coordination layer (and a bug once you pass ~10 children with multiple human contributors — revisit then). The one mechanical check you should *not* skip, even here, is a **floor secret-scan** (e.g. gitleaks on push): it's cheap, and a credential leaked into a handoff doc or session manifest is precisely the failure social enforcement can't catch. Heavy CI (lint/typecheck/test) still belongs in the children; the secret-scan floor belongs everywhere, ops repos included.
 
 **Manual ROADMAP maintenance.** The ROADMAP drifts if no one updates it. The `/wrap-up` ritual (or equivalent — a slash command, a Friday habit, a Friday-afternoon-reminder bot) is how you keep it honest. Without that, the ROADMAP becomes outdated in 2–3 weeks and the pattern breaks down.
 
@@ -385,9 +399,9 @@ The pattern crystallized from `mriechers/homelab`, a coordination layer over fiv
 | `SAFETY_CONTRACT.md` | 8 shared safety rules, mechanization table per child, quarterly fire-drill ritual |
 | `SHARED_TOOLING.md` | Inventory of guardians, mad scientists, backup-log patterns, doc-crawl tools, knowledge-sync directions — labeled with consolidation effort/risk |
 | `planning/HANDOFF_TEMPLATE.md` | Canonical handoff template; 30+ dated handoffs from 2026-05-26 onward live alongside it |
-| `planning/<domain-class>/` | `planning/nas-file-operations/` — binding contract for any agent doing bulk file ops on the NAS; reference impl is `media-archivist`, with `rom-archivist` and `dev-archivist` following the same shape |
-| `.claude/agents/` | Three cross-cutting archivists: `media-archivist`, `rom-archivist`, `dev-archivist` |
-| `.claude/skills/` | Twelve skills — three parallel four-stage pipelines (scan / classify / plan / execute) for media, ROM, and dev domains |
+| `planning/<domain-class>/` | **Two** binding-contract domains: `planning/nas-file-operations/` (mutating — bulk file ops on the NAS; reference impl `media-archivist`, with `rom-archivist`/`dev-archivist` following the same shape) and `planning/security/` (read-only audit harness — threat-model + checks + baseline + `run.sh`) |
+| `.claude/agents/` | **Ten** cross-cutting agents, all defined at the parent (single definition, no symlink): four archivists (`media-`, `rom-`, `dev-`, `consolidation-archivist`), three Guardians (`opnsense-`, `proxmox-`, `home-assistant-guardian`), two mad-scientists (`proxmox-`, `homeassistant-mad-scientist`), and `homeassistant-device-inventory` |
+| `.claude/skills/` | **Twenty** skills — five parallel four-stage pipelines (scan / classify / plan / execute) for media, ROM, dev, and recovered/consolidation domains, plus standalones (`homelab-theme`, `homelab-threat-assessment`, `immich`); nearly every skill ships a `GOTCHAS.md` companion |
 | Workspace file | `homelab.code-workspace` loading all five sibling repos as peer folders |
 
 The homelab repo is the lived test of every claim in this design doc. Where this doc says "known gap," it's because the homelab hit that gap. Where it says "the binding contract pattern works for any risky domain," it's because the same shape works for media, ROMs, and dev-folder cleanup with only the domain-specific axes changing.

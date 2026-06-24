@@ -12,7 +12,7 @@ Shared safety rules that every child repo in this workspace inherits. Each child
 2. **Validate state changes.** After a state change, verify the new state matches the expected state before considering the operation complete. Don't trust that "the command returned 0" means "it worked" — observe the resulting state.
 3. **Plan rollback.** Before executing a state change, the agent must have a documented rollback procedure. Either inline in the session log, or in the handoff doc that scheduled the change.
 4. **Stage destructive work.** For multi-step destructive operations, stage the work so that each step is reviewable independently. Don't bundle "delete N files" into one approval — emit a manifest, get approval, then execute row-by-row.
-5. **No secrets in handoff docs or session manifests.** Agents must redact secrets (API tokens, passwords, private keys) from any artifact that lands in this metarepo or its child repos. If a value must be referenced, use a placeholder + a pointer to its canonical storage (1Password, vault, secrets manager).
+5. **No secrets in handoff docs or session manifests.** Agents must redact secrets (API tokens, passwords, private keys) from any artifact that lands in this ops repo or its child repos. If a value must be referenced, use a placeholder + a pointer to its canonical storage (1Password, vault, secrets manager).
 
 ## Mechanization
 

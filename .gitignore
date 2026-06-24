@@ -1,5 +1,5 @@
 # Child repo working copies — they have their own remotes and live as siblings, not subdirectories.
-# When you `git clone` a child repo into this metarepo's parent directory, add it here.
+# When you `git clone` a child repo into this ops repo's parent directory, add it here.
 # Example:
 # my-service-a/
 # my-service-b/

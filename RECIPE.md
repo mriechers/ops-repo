@@ -18,8 +18,8 @@ Locally, clone it into your workspace as a peer to your child repos:
 
 ```bash
 cd ~/Code/myorg/
-git clone git@github.com:yourname/your-metarepo-name.git
-cd your-metarepo-name
+git clone git@github.com:yourname/your-ops-repo-name.git
+cd your-ops-repo-name
 ```
 
 ## Step 2 — Fill the `CLAUDE.md` slots
@@ -30,7 +30,7 @@ Open `CLAUDE.md` and fill in:
 2. **Sibling repos table** — one row per child repo with subproject name, purpose, remote, path to that child's `CLAUDE.md`
 3. **(Optional) Hardware or services inventory** — if your child repos manage physical devices, cloud resources, or production services. Delete this section if not applicable.
 4. **Why this layer exists** — the one-paragraph failure-mode statement (the sentence you wrote in "Before you start" goes here, expanded)
-5. **Rules for agents** — five inherited rules ship verbatim; tweak rule 5 (public vs. private parent) based on whether this metarepo is public
+5. **Rules for agents** — the inherited rules ship verbatim (including the purity rule: an ops repo houses no first-party buildable code); tweak rule 5 (public vs. private parent) based on whether this ops repo is public
 6. **Cross-cutting platforms** — fill in if you have shared infrastructure (observability, auth, deploy pipeline, etc.); delete if you don't yet
 7. **Team structure** — inherited verbatim; modify when your team-structure-log gives you data to revise it
 
@@ -125,7 +125,7 @@ When your first cross-repo task lands, this is where the pattern earns its keep.
 1. Copy `planning/HANDOFF_TEMPLATE.md` → `planning/<YYYY-MM-DD>-<topic>-handoff.md` (use today's date)
 2. Fill the Context, Originating project, Receiving project sections
 3. Write the "What needs to happen" checklist for the receiving side
-4. Commit it to the parent metarepo
+4. Commit it to the parent ops repo
 5. When the receiving project's session picks it up, they update the agent log and check off items
 
 If your first handoff doesn't feel like it earned its weight (the work was trivial enough to do inline), that's fine — but if you keep skipping it, the coordination layer isn't load-bearing for you yet. Either find a real cross-repo workstream or shelf the pattern.
